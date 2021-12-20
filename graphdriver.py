@@ -1,0 +1,55 @@
+from os import name
+from typing import Dict, List
+from neo4j import GraphDatabase
+from create_test_data import create_test_data
+class GraphDBDriver:
+    def __init__(self, uri, user, password):
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+    def close(self):
+        self.driver.close()
+
+    def populateNetwork(self, article):
+        with self.driver.session() as session:
+            session.write_transaction(self._create_network_from_article, article)
+    def get_node_by_name(self):
+        with self.driver.session() as session:
+            result = session.read_transaction(self._get_node_by_name)
+        self.driver.close()
+        return result
+    @staticmethod
+    def _create_network_from_article(tx, article):
+        doi = article["doi"]
+        title = article["title"]
+        abstract = article["abstract"]
+        authors = article["authors"]
+        keywords = article["keywords"]
+        journal = article["journal"]
+        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract})', doi=doi, title=title, abstract=abstract)
+        for author in authors:
+            tx.run('MERGE (a:Author {name: $name})', name=author)
+            tx.run('MATCH (a:Article {title:$title}), (b:Author {name:$author}) MERGE (b)-[r:isAuthor]->(a)', title=title, author=author)
+        for keyword in keywords:
+            tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
+            tx.run('MATCH (a:Article {title:$title}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', title=title, keyword=keyword)
+        tx.run('MERGE (a:Journal {name:$journal})', journal=journal)
+        tx.run('MATCH (a:Article  {title:$title}), (b:Journal {name:$journal}) MERGE (a)-[r:publishedIn]->(b)', title=title, journal=journal)
+    @staticmethod
+    def _get_node_by_name(tx):
+        nodes = []
+        results = tx.run('MATCH (n:Article) RETURN n LIMIT 1')
+        for record in results:
+            nodes.append(record)
+        return nodes
+    @staticmethod
+    def _find_article_relations(tx, article):
+        doi = article["doi"]
+        title = article["title"]
+        abstract = article["abstract"]
+        authors = article["authors"]
+        keywords = article["keywords"]
+        journal = article["journal"]
+if __name__ == "__main__":
+    driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
+    result = driver.get_node_by_name()
+    test = 0
