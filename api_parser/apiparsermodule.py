@@ -1,12 +1,26 @@
+from __future__ import print_function
 import urllib.request as libreq
-import xmltodict
-
+import xmltodict, time, logging, woslite_client, scholarly
+from woslite_client.rest import ApiException
+from pprint import pprint
+from scholarly import ProxyGenerator
 class ApiParserModule:
     def __init__(self):
         self.arxiv_base_url = "http://export.arxiv.org/api/query?search_query="
         self.chemrxiv_base_url = "https://chemrxiv.org/engage/chemrxiv/public-api/v1/items"
-
+        # Configure API key authorization for web of science: key
+        configuration = woslite_client.Configuration()
+        configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
+        self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
+        #Set up Google Scholar Proxy
+        pg = ProxyGenerator()
+        #Uses free proxy - TODO: change to own proxy
+        success = pg.FreeProxies()
+        scholarly.use_proxy(pg)
+        logging.basicConfig(filename = "logs/api/parser.log", level=logging.INFO)
+    
     def parse(self, api: str, query_param:str):
+        #ARXIV parses all available fields
         if api == "arxiv":
             query_param = query_param.replace(" ", "+")
             query_param = "%22" + query_param + "%22"
@@ -21,8 +35,28 @@ class ApiParserModule:
             params = {"term": query_param}
             
             pass
+            #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
         if api == "wos":
-            pass
+            database_id = "WOS"
+            usr_query = f'TI=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
+            count = 1  # int | Number of records returned in the request
+            first_record = 1  # int | Specific record, if any within the result set to return. Cannot be less than 1 and greater than 100000.
+            try:
+                # Find record(s) by specific id
+                api_response = self.wos_search_api_instance.root_get(database_id=database_id, usr_query=usr_query, count=count, first_record=first_record)
+                article_list = parse_wos_results(api_response)
+                if article_list != None:
+                    return article_list
+                else:
+                    logging.info(f"{query_param} not found")
+        
+            except ApiException as e:
+                print("Exception when calling IntegrationApi->id_unique_id_get: %s\\n" % e)
+        #Scholar parses for article titles
+        if api == "scholar":
+            search_query = scholarly.search_pubs(query_param)
+            test = 0
+            pass       
 """
 Takes an ARXIV API result dicts, iterates through results and returns a list with article dicts in it
 """
@@ -78,6 +112,19 @@ def parse_chemrxiv_results(results_):
             article["keyword"] = [keyword["name"] for keyword in article_["item"]["categories"]]
             article_list.append(article)
     return article_list
+def parse_wos_results(api_response):
+    article = {}
+    if api_response.data != []:
+        article["title"] = api_response.data[0].title.title[0]
+        article["abstract"] = ""
+        article["authors"] = [author.split(",")[1].strip()+ " " + author.split(",")[0] for author in api_response.data[0].author.authors]
+        try:
+            article["doi"] = api_response.data[0].other.identifier_doi[0]
+        except TypeError as e:
+            article["doi"]  = ""
+        article["journal"] = api_response.data[0].source.source_title[0] + " " + api_response.data[0].source.volume[0]
+        article["keyword"] = api_response.data[0].keyword.keywords
+        return article
 if __name__ == "__main__":
     parser = ApiParserModule()
     article_list = parser.parse("arxiv", "cond-mat.mtrl-sci")
