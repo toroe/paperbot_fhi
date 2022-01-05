@@ -1,6 +1,7 @@
 from os import name
 from typing import Dict, List
 from neo4j import GraphDatabase
+import json
 from create_test_data import create_test_data
 class GraphDBDriver:
     def __init__(self, uri, user, password):
@@ -29,15 +30,16 @@ class GraphDBDriver:
         title = article["title"]
         abstract = article["abstract"]
         authors = article["authors"]
-        keywords = article["keywords"]
+        keywords = article["keyword"]
         journal = article["journal"]
         tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract})', doi=doi, title=title, abstract=abstract)
         for author in authors:
             tx.run('MERGE (a:Author {name: $name})', name=author)
             tx.run('MATCH (a:Article {title:$title}), (b:Author {name:$author}) MERGE (b)-[r:isAuthor]->(a)', title=title, author=author)
-        for keyword in keywords:
-            tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
-            tx.run('MATCH (a:Article {title:$title}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', title=title, keyword=keyword)
+        if keywords is not None:
+            for keyword in keywords:
+                tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
+                tx.run('MATCH (a:Article {title:$title}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', title=title, keyword=keyword)
         tx.run('MERGE (a:Journal {name:$journal})', journal=journal)
         tx.run('MATCH (a:Article  {title:$title}), (b:Journal {name:$journal}) MERGE (a)-[r:publishedIn]->(b)', title=title, journal=journal)
     @staticmethod
@@ -69,6 +71,8 @@ class GraphDBDriver:
         tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
 if __name__ == "__main__":
     driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
-    post = {"post_id": 1, "user_id": "lolhuso", "action" : "upvote"}
-    result = driver.update_post_ranking(post)
+    with open("data/parsed_articles.json", "r") as fp:
+        articles = json.load(fp)
+    for article in articles:
+        driver.populateNetwork(article)
     test = 0
