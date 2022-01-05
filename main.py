@@ -1,3 +1,4 @@
+from io import StringIO
 from fastapi import FastAPI, Form, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,7 @@ from api_parser.apiparsermodule import ApiParserModule
 app = FastAPI()
 templates = Jinja2Templates(directory="frontend/templates")
 db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
-api_parser = ApiParserModule()
+#api_parser = ApiParserModule()
 app.add_middleware(
     CORSMiddleware,
     allow_credentials = True,
@@ -32,7 +33,15 @@ class Articles(BaseModel):
     articles: List[Article]
 class TitleList(BaseModel):
     titles: List[str]
-    
+class MattermostContext(BaseModel):
+    action: str
+class MatterMostRequest(BaseModel):
+    user_id: str
+    post_id: str
+    channel_id: str
+    team_id: str
+    context: MattermostContext
+
 @app.post("/addarticles/")
 async def add_article_to_graph(articles: Articles):
     print("success")
@@ -52,6 +61,8 @@ async def add_article_by_list(titlelist: TitleList):
 
     with open("paperbot_clean_titles.json", "w") as f:
         json.dump(titlelist.titles, f)
-
+@app.post("/update_article_ranking/")
+async def update_article_ranking(mattermost_request: MatterMostRequest):
+    print("success")
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="info")
+    uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="debug")
