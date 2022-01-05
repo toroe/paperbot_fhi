@@ -40,7 +40,7 @@ class MatterMostRequest(BaseModel):
     post_id: str
     channel_id: str
     team_id: str
-    context: MattermostContext
+    context: Dict[str, str]
 
 @app.post("/addarticles/")
 async def add_article_to_graph(articles: Articles):
@@ -63,6 +63,10 @@ async def add_article_by_list(titlelist: TitleList):
         json.dump(titlelist.titles, f)
 @app.post("/update_article_ranking/")
 async def update_article_ranking(mattermost_request: MatterMostRequest):
-    print("success")
+    post = {}
+    post["post_id"] = mattermost_request.post_id
+    post["user_id"] = mattermost_request.user_id
+    post["action"] = mattermost_request.context["action"]
+    db_driver.update_post_ranking(post)
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="debug")

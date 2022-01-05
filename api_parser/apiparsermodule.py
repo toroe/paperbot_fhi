@@ -1,9 +1,8 @@
 from __future__ import print_function
 import urllib.request as libreq
-import xmltodict, time, logging, woslite_client, scholarly
+import xmltodict, time, logging, woslite_client
 from woslite_client.rest import ApiException
 from pprint import pprint
-from scholarly import ProxyGenerator
 class ApiParserModule:
     def __init__(self):
         self.arxiv_base_url = "http://export.arxiv.org/api/query?search_query="
@@ -12,13 +11,7 @@ class ApiParserModule:
         configuration = woslite_client.Configuration()
         configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
         self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
-        #Set up Google Scholar Proxy
-        pg = ProxyGenerator()
-        #Uses free proxy - TODO: change to own proxy
-        success = pg.FreeProxies()
-        scholarly.use_proxy(pg)
-        logging.basicConfig(filename = "logs/api/parser.log", level=logging.INFO)
-    
+      
     def parse(self, api: str, query_param:str):
         #ARXIV parses all available fields
         if api == "arxiv":
@@ -52,11 +45,7 @@ class ApiParserModule:
         
             except ApiException as e:
                 print("Exception when calling IntegrationApi->id_unique_id_get: %s\\n" % e)
-        #Scholar parses for article titles
-        if api == "scholar":
-            search_query = scholarly.search_pubs(query_param)
-            test = 0
-            pass       
+     
 """
 Takes an ARXIV API result dicts, iterates through results and returns a list with article dicts in it
 """

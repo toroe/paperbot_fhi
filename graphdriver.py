@@ -12,11 +12,17 @@ class GraphDBDriver:
     def populateNetwork(self, article):
         with self.driver.session() as session:
             session.write_transaction(self._create_network_from_article, article)
+        self.driver.close()
     def get_node_by_name(self):
         with self.driver.session() as session:
             result = session.read_transaction(self._get_node_by_name)
         self.driver.close()
         return result
+    def update_post_ranking(self, post):
+        with self.driver.session() as session:
+            post_ = session.read_transaction(self._get_post_by_id, post["post_id"])
+            if post_ == []:
+                session.write_transaction(self._create_post, post)
     @staticmethod
     def _create_network_from_article(tx, article):
         doi = article["doi"]
@@ -49,7 +55,20 @@ class GraphDBDriver:
         authors = article["authors"]
         keywords = article["keywords"]
         journal = article["journal"]
+    @staticmethod 
+    def _get_post_by_id(tx, post_id):
+        posts = []
+        result = tx.run("MATCH (p:Post) WHERE p.id ={post_id:$post_id} RETURN p",  post_id=post_id)
+        for record in result:
+            posts.append(record)
+        return posts
+    @staticmethod
+    def _create_post(tx, post):
+        tx.run("MERGE (p:Post {id:$post_id})", post_id=post["post_id"])
+        tx.run("MERGE (u:User {id:$user_id})", user_id=post["user_id"])  
+        tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
 if __name__ == "__main__":
     driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
-    result = driver.get_node_by_name()
+    post = {"post_id": 1, "user_id": "lolhuso", "action" : "upvote"}
+    result = driver.update_post_ranking(post)
     test = 0
