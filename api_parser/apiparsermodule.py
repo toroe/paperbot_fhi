@@ -1,6 +1,6 @@
 from __future__ import print_function
 import urllib.request as libreq
-import xmltodict, time, logging, woslite_client, scholarly
+import xmltodict, time, logging, woslite_client, scholarly, requests
 from woslite_client.rest import ApiException
 from pprint import pprint
 from scholarly import ProxyGenerator
@@ -11,20 +11,15 @@ class ApiParserModule:
         # Configure API key authorization for web of science: key
         configuration = woslite_client.Configuration()
         configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
-        self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
-        #Set up Google Scholar Proxy
-        pg = ProxyGenerator()
-        #Uses free proxy - TODO: change to own proxy
-        success = pg.FreeProxies()
-        scholarly.use_proxy(pg)
-        logging.basicConfig(filename = "logs/api/parser.log", level=logging.INFO)
+   #     self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
+
     
     def parse(self, api: str, query_param:str):
         #ARXIV parses all available fields
         if api == "arxiv":
             query_param = query_param.replace(" ", "+")
             query_param = "%22" + query_param + "%22"
-            search_query = f"all:{query_param}&start=0&max_results=10"
+            search_query = f"all:{query_param}&start=0&max_results=20&sortBy=submittedDate"
             query_url = self.arxiv_base_url + search_query
             with libreq.urlopen(query_url) as url:
                 r = url.read()
@@ -32,9 +27,10 @@ class ApiParserModule:
             article_list = parse_arxiv_result_dict(article_dict)
             return article_list
         if api == "chemrxiv":
-            params = {"term": query_param}
-            
-            pass
+            params = {"term": query_param, "limit": 20}
+            r = requests.get(self.chemrxiv_base_url, params=params)
+            article_list = parse_chemrxiv_results(r.json())
+            return article_list
             #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
         if api == "wos":
             database_id = "WOS"
@@ -127,5 +123,5 @@ def parse_wos_results(api_response):
         return article
 if __name__ == "__main__":
     parser = ApiParserModule()
-    article_list = parser.parse("arxiv", "cond-mat.mtrl-sci")
+    article_list = parser.parse("chemrxiv", "Karsten Reuter")
     test = 0
