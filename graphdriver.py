@@ -20,17 +20,17 @@ class GraphDBDriver:
         self.driver.close()
         return result
     def update_post_ranking(self, post):
-        with self.driver.session() as session:
-            post_ = session.read_transaction(self._get_post_by_id, post["post_id"])
-            if post_ == []:
-                session.write_transaction(self._create_post, post)
+        with self.driver.session() as session:      
+            session.write_transaction(self._update_post, post)
+    def check_article_relevance(self, article):
+        pass
     @staticmethod
     def _create_network_from_article(tx, article):
         doi = article["doi"]
         title = article["title"]
         abstract = article["abstract"]
         authors = article["authors"]
-        keywords = article["keyword"]
+        keywords = article["keywords"]
         journal = article["journal"]
         tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract})', doi=doi, title=title, abstract=abstract)
         for author in authors:
@@ -50,7 +50,7 @@ class GraphDBDriver:
             nodes.append(record)
         return nodes
     @staticmethod
-    def _find_article_relations(tx, article):
+    def _check_article_relevance(tx, article):
         doi = article["doi"]
         title = article["title"]
         abstract = article["abstract"]
@@ -65,12 +65,12 @@ class GraphDBDriver:
             posts.append(record)
         return posts
     @staticmethod
-    def _create_post(tx, post):
+    def _update_post(tx, post):
         tx.run("MERGE (p:Post {id:$post_id})", post_id=post["post_id"])
         tx.run("MERGE (u:User {id:$user_id})", user_id=post["user_id"])  
         tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
 if __name__ == "__main__":
-    driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
+    driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
     with open("data/parsed_articles.json", "r") as fp:
         articles = json.load(fp)
     for article in articles:

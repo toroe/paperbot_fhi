@@ -4,12 +4,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
-import json
+import json, csv
 from graphdriver import *
 from api_parser.apiparsermodule import ApiParserModule
 app = FastAPI()
 templates = Jinja2Templates(directory="frontend/templates")
-db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
+db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
 #api_parser = ApiParserModule()
 app.add_middleware(
     CORSMiddleware,
@@ -41,7 +41,8 @@ class MatterMostRequest(BaseModel):
     channel_id: str
     team_id: str
     context: Dict[str, str]
-
+class Intermediate(BaseModel):
+    content: Dict[str, int]
 @app.post("/addarticles/")
 async def add_article_to_graph(articles: Articles):
     print("success")
@@ -57,10 +58,12 @@ async def add_article_to_graph(article: Article):
     article_["journal"] = article.journal
     db_driver.populateNetwork(article_)
 @app.post("/addbylist/")
-async def add_article_by_list(titlelist: TitleList):
+async def add_keywords(keywords: Intermediate):
 
-    with open("paperbot_clean_titles.json", "w") as f:
-        json.dump(titlelist.titles, f)
+    with open("data/keywordsss.csv", "w") as csv_f:
+        writer = csv.writer(csv_f)
+        for key, value in keywords.content.items():
+            writer.writerow([key, value])
 @app.post("/update_article_ranking/")
 async def update_article_ranking(mattermost_request: MatterMostRequest):
     post = {}
