@@ -1,7 +1,10 @@
 from io import StringIO
-from fastapi import FastAPI, Form, Request
+import logging
+from fastapi import FastAPI, Request, status, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import uvicorn
 from pydantic import BaseModel
 import json, csv
@@ -9,7 +12,7 @@ from graphdriver import *
 from api_parser.apiparsermodule import ApiParserModule
 app = FastAPI()
 templates = Jinja2Templates(directory="frontend/templates")
-db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
+db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
 #api_parser = ApiParserModule()
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +46,8 @@ class MatterMostRequest(BaseModel):
     context: Dict[str, str]
 class Intermediate(BaseModel):
     content: Dict[str, int]
+class DoiCommand(BaseModel):
+    payload: Dict[str,str]
 @app.post("/addarticles/")
 async def add_article_to_graph(articles: Articles):
     print("success")
@@ -71,5 +76,20 @@ async def update_article_ranking(mattermost_request: MatterMostRequest):
     post["user_id"] = mattermost_request.user_id
     post["action"] = mattermost_request.context["action"]
     db_driver.update_post_ranking(post)
+@app.post("/add_doi/")
+async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_id:str = Form(...), channel_id:str = Form(...)):
+    if token == "ok3t9dmjtp8n8qq3s8ww4mxdhy":
+        print(text)
+        print(user_id)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
+	logging.error(f"{request}: {exc_str}")
+	content = {'status_code': 10422, 'message': exc_str, 'data': None}
+	return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="debug")
+    uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="debug", debug=True)
