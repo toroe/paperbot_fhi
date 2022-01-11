@@ -1,16 +1,24 @@
-from api_parser.apiparsermodule import ApiParserModule
-import json
+"""
+import csv
+with open("data/keywords.csv", mode='r') as inp:
+    reader = csv.reader(inp)
+    one_dict_from_csv = {rows[0]:rows[1] for rows in reader}
+with open("data/keywordss.csv", mode='r') as inp:
+    reader = csv.reader(inp)
+    two_dict_from_csv = {rows[0]:rows[1] for rows in reader}
+with open("data/keywordsss.csv", mode='r') as inp:
+    reader = csv.reader(inp)
+    three_dict_from_csv = {rows[0]:rows[1] for rows in reader}
+print(three_dict_from_csv)
+new_keys = {}
+new_keys["wos"] = one_dict_from_csv
+new_keys["arxiv"] = three_dict_from_csv
+new_keys["chemrxiv"] = two_dict_from_csv
+with open("data/merged_keywords.csv", "w") as csv_f:
+    writer = csv.writer(csv_f)
+    for key, value in new_keys.items():
+        writer.writerow([key, value])
+        """
+import webbrowser
 
-with open("paperbot_clean_titles.json", "r", encoding = "ascii") as f:
-    article_titles = json.load(f)
-api_parser = ApiParserModule()
-article_list = []
-for title in article_titles:
-    title = title.replace('"', "")
-    title = title.encode("ascii", "ignore")
-    title = title.decode()
-    article = api_parser.parse("wos", title)
-    if article != None:
-     article_list.append(article)
-with open("parsed_articles.json", "w") as fp:
-    json.dump(article_list, fp)
+webbrowser.open("http://gateway.webofknowledge.com/gateway/Gateway.cgi?GWVersion=2&SrcApp=PARTNER_APP&SrcAuth=LinksAMR&KeyUT=WOS:000423197900018&DestLinkType=CitingArticles&DestApp=ALL_WOS&UsrCustomerID=6992c4ee433f66f92fb5ad6d074df405")
