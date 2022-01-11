@@ -2,7 +2,6 @@ from os import name
 from typing import Dict, List
 from neo4j import GraphDatabase
 import json
-from create_test_data import create_test_data
 class GraphDBDriver:
     def __init__(self, uri, user, password):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
