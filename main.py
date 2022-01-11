@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import uvicorn
 from pydantic import BaseModel
+import random
 import json, csv
 from graphdriver import *
 from api_parser.apiparsermodule import ApiParserModule
@@ -81,8 +82,11 @@ async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_i
     if token == "ok3t9dmjtp8n8qq3s8ww4mxdhy":
         print(text)
         print(user_id)
-
-
+@app.get("/update_kiosk/")
+async def update_kiosk():
+    random_ = random.randint(1,10)
+    tb_r = [{"title": "test " + str(random_), "body": "test" + str(random_), "journal": "test" + str(random_)}]
+    return tb_r
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')

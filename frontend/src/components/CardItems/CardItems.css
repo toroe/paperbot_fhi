@@ -1,0 +1,16 @@
+.CardItems {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+.UpdateButton{
+ background-color:#ffffff;
+ border-color: #118a74 ;
+
+ border-radius:7px;
+color: #118a74;
+ padding:10px 25px;
+ text-align:center;
+ font-size:20px;
+ cursor:pointer;
+}
