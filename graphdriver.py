@@ -1,4 +1,4 @@
-from os import name
+from os import name, environ
 from typing import Dict, List
 from neo4j import GraphDatabase
 import json
@@ -21,8 +21,22 @@ class GraphDBDriver:
     def update_post_ranking(self, post):
         with self.driver.session() as session:      
             session.write_transaction(self._update_post, post)
+        self.driver.close()
     def check_article_relevance(self, article):
         pass
+    def add_citing_articles(self, article, source_doi):
+        with self.driver.session() as session:
+            session.write_transaction(self._create_network_from_article, article)
+            session.write_transaction(self._add_citing_articles, article, source_doi)
+        self.driver.close()
+        
+    @staticmethod 
+    def _add_citing_articles(tx, article, source_doi):
+        result = tx.run('MATCH (a:Article  {doi:$source_doi}), (b:Article {title:$title}) MERGE (b)-[r:cites]->(a) RETURN a, b', title=article["title"], source_doi=source_doi)
+        for record in result:
+            print("Create relationship between {doi1} and {doi2}".format(doi1=record["a"]["doi"], doi2 = record["b"]["doi"]))
+             
+
     @staticmethod
     def _create_network_from_article(tx, article):
         doi = article["doi"]
@@ -68,6 +82,7 @@ class GraphDBDriver:
         tx.run("MERGE (p:Post {id:$post_id})", post_id=post["post_id"])
         tx.run("MERGE (u:User {id:$user_id})", user_id=post["user_id"])  
         tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
+
 if __name__ == "__main__":
     driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
     with open("data/parsed_articles.json", "r") as fp:
