@@ -9,11 +9,13 @@ import uvicorn
 from pydantic import BaseModel
 import random
 import json, csv
+from chatbotactions import ChatBot
 from graphdriver import *
 from api_parser.apiparsermodule import ApiParserModule
 app = FastAPI()
 templates = Jinja2Templates(directory="frontend/templates")
 db_driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "$cheisse4ldder")
+#chat_bot = ChatBot()
 #api_parser = ApiParserModule()
 app.add_middleware(
     CORSMiddleware,
@@ -85,8 +87,11 @@ async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_i
 @app.get("/update_kiosk/")
 async def update_kiosk():
     random_ = random.randint(1,10)
-    tb_r = [{"title": "test " + str(random_), "body": "test" + str(random_), "journal": "test" + str(random_)}]
-    return tb_r
+    article = [{"title": "test " + str(x), "body": "test" + str(x), "journal": "test" + str(x)} for x in range(10)]
+   #chat_bot.post_relevant_article(article[0])
+    return article
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
