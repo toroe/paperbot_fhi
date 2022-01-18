@@ -1,2 +1,15 @@
 node_modules
 
+logs/api/parser.log
+data/keywordsss.csv
+data/keywordss.csv
+data/keywords.csv
+data/amr_input.csv
+data/output.csv
+data/paperbot_clean_titles.json
+data/parsed_articles.json
+data/new_parsed.json
+data/not_found.json
+api_parser/__pycache__/apiparsermodule.cpython-38.pyc
+__pycache__/main.cpython-38.pyc
+__pycache__/main.cpython-38.pyc

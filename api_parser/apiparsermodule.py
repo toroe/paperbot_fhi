@@ -10,8 +10,8 @@ class ApiParserModule:
         # Configure API key authorization for web of science: key
         configuration = woslite_client.Configuration()
         configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
-   #     self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
-
+        self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
+   #    
     
     def parse(self, api: str, query_param:str):
         #ARXIV parses all available fields
@@ -30,7 +30,7 @@ class ApiParserModule:
             r = requests.get(self.chemrxiv_base_url, params=params)
             article_list = parse_chemrxiv_results(r.json())
             return article_list
-            #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
+        #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
         if api == "wos":
             database_id = "WOS"
             usr_query = f'TI=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
@@ -43,10 +43,12 @@ class ApiParserModule:
                 if article_list != None:
                     return article_list
                 else:
+                    
                     logging.info(f"{query_param} not found")
+                    return f"{query_param} not found"
         
             except ApiException as e:
-                print("Exception when calling IntegrationApi->id_unique_id_get: %s\\n" % e)
+                print("Exception when calling SearchApi->root_get: %s\\n" % e)
      
 """
 Takes an ARXIV API result dicts, iterates through results and returns a list with article dicts in it
@@ -113,7 +115,10 @@ def parse_wos_results(api_response):
             article["doi"] = api_response.data[0].other.identifier_doi[0]
         except TypeError as e:
             article["doi"]  = ""
-        article["journal"] = api_response.data[0].source.source_title[0] + " " + api_response.data[0].source.volume[0]
+        try:
+            article["journal"] = api_response.data[0].source.source_title[0] + " " + api_response.data[0].source.volume[0]
+        except TypeError as e:
+            article["journal"] = ""
         article["keyword"] = api_response.data[0].keyword.keywords
         return article
 if __name__ == "__main__":
