@@ -131,6 +131,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get("/debug/")
 async def debug_conn():
     print("success")
-    
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=5001, log_level="debug")
+    uvicorn.run("main:app", host="0.0.0.0", port=5001, log_level="debug")
