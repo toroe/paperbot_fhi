@@ -22,9 +22,9 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S')
-db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],os.environ["NEO4J_PASSWORD"])
+db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],"$cheisse4ldder")
 api_parser = ApiParserModule()
-#chatbot = ChatBot()
+chatbot = ChatBot(token= "cw4ona15y3f57mobs3p6rdba5r", primary_channel_id="u7km46zfofrpzf3q7m344mj5kw")
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,7 +95,7 @@ async def add_keywords(keywords: Intermediate):
         for key, value in keywords.content.items():
             writer.writerow([key, value])
 
-@app.post("/update_article_ranking/")
+@app.post("/chatbot/update_article_ranking/")
 async def update_article_ranking(mattermost_request: MatterMostRequest):
     post = {}
     post["post_id"] = mattermost_request.post_id
@@ -104,22 +104,26 @@ async def update_article_ranking(mattermost_request: MatterMostRequest):
     db_driver.update_post_ranking(post)
 
 
-@app.post("/add_doi/")
+@app.post("/chatbot/add_doi/")
 async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_id:str = Form(...), channel_id:str = Form(...)):
     if token == "ok3t9dmjtp8n8qq3s8ww4mxdhy":
         print(text)
         print(user_id)
 
+@app.get("/chatbot/post_relevant_article/")
+async def post_relevant_article():
+    articles = db_driver.get_relevant_articles()
+    relevant_article = random.choice(articles)
+    chatbot.post_relevant_article(relevant_article)
 
-@app.get("/update_kiosk/")
+@app.get("/kiosk/update/")
 async def update_kiosk(k=6):
     relevant_articles = db_driver.get_relevant_articles()
     for article in relevant_articles:
-        
         article["authors"] = db_driver.get_article_authors(article["doi"])
         article["journal"] = db_driver.get_article_journal(article["doi"])
-
     return [random.choice(relevant_articles) for idx in range(k)]
+
 @app.post("/link_citations/")
 async def link_citations(citation_mapping: CitationMapping):
     for article in citation_mapping.articles:

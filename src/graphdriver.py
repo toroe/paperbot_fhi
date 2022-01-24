@@ -51,18 +51,25 @@ class GraphDBDriver:
                 authors_.append(author["b"]["name"])
         self.driver.close()
         return authors_
+
     def get_article_journal(self, doi):
         with self.driver.session() as session:
             journal = session.read_transaction(self._get_article_journal, doi)
 
         journal_ = journal[0]["b"]["name"]
         return journal_
+
     def add_citing_articles(self, article, source_doi):
         with self.driver.session() as session:
             session.write_transaction(self._add_article_to_graph, article)
             session.write_transaction(self._add_citing_articles, article, source_doi)
         self.driver.close()
-        
+
+    def update_article_post(self, article_doi, post_id):
+        with self.driver.session() as session:
+            session.write_transaction(self._update_article_post, article_doi, post_id)
+        self.driver.close() 
+
     @staticmethod 
     def _add_citing_articles(tx, article, source_doi):
         result = tx.run('MATCH (a:Article  {doi:$source_doi}), (b:Article {doi:$doi}) MERGE (b)-[r:cites]->(a) RETURN a, b', doi=article["doi"], source_doi=source_doi)
@@ -118,12 +125,11 @@ class GraphDBDriver:
         results = tx.run('MATCH (a:Article{doi:$doi}) -[:publishedIn]->(b) RETURN b', doi=doi)
         journal = [record for record in results]
         return journal
+        
     @staticmethod
     def __get_relevant_articles(tx):
         results = tx.run("MATCH (a:Article) WHERE 2022 - a.publication_year <=3 AND (a.generation=0 OR ((a)<-[:user_added]-())) RETURN a LIMIT 25")
-        #results = tx.run("MATCH (a:Article{doi:$TEST_DOI}) RETURN a", TEST_DOI="TEST_DOI")
         articles = [record for record in results]
-
         return articles
     @staticmethod 
     def _get_post_by_id(tx, post_id):
@@ -134,10 +140,25 @@ class GraphDBDriver:
         return posts
     @staticmethod
     def _update_post(tx, post):
-        tx.run("MERGE (p:Post {id:$post_id})", post_id=post["post_id"])
-        tx.run("MERGE (u:User {id:$user_id})", user_id=post["user_id"])  
+        post_id=post["post_id"]
+        user_id=post["user_id"]
+
+        tx.run("MERGE (p:Post {id:$post_id})", post_id=post_id)
+        tx.run("MERGE (u:User {id:$user_id})", user_id=user_id)  
         tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
-    
+        logmessage = f"GRAPHLOG: REGISTERED VOTE FOR POST: {post_id} FROM USER: {user_id}"
+        logging.info(logmessage)
+    @staticmethod
+    def _update_article_post(tx, article_doi, post_id):
+        post_date=date.today()
+        result = tx.run("MATCH (a:Article{doi:$doi}) MERGE (p:Post{id:$id}) MERGE (a)-[r:posted]->(p) SET p.post_date = $post_date RETURN r", doi=article_doi, id=post_id, post_date=post_date) 
+        posts = [record for record in result]
+        if posts is not None:
+            logmessage = f"GRAPHLOG: CREATE POST: {post_id} WITH RELATIONSHIP TO {article_doi}"
+            logging.info(logmessage)
+        else:
+            logging.info("GRAPHLOG: ERROR SETTING POST")
+        return posts
 if __name__ == "__main__":
     driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
     dois = driver.get_article_authors("10.1063/5.0071249")

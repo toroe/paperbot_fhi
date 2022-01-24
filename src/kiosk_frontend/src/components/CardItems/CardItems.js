@@ -10,7 +10,7 @@ function CardItems() {
    
   const fetchPost = () => {
     console.log("in fetchPost");
-    fetch("http://localhost:5001/update_kiosk/")
+    fetch("http://localhost:5001/kiosk/update/")
       .then((res) => res.json())
       .then((result) => {
         console.log(result);
