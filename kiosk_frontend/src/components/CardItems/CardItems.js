@@ -20,7 +20,7 @@ function CardItems() {
          
   useEffect(() => {
     fetchPost();
-    setInterval(fetchPost, 5000);
+    setInterval(fetchPost, 60000);
     
   }, [])
      
@@ -33,8 +33,11 @@ function CardItems() {
         {cards.map((card) => (
           <CardItem
             title={card.title}
-            author={card.body}
+            doi={card.doi}
+            authors={card.authors}
             journal={card.journal}
+            publication_year={card.publication_year}
+
           />
         ))}
       </div>

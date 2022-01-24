@@ -13,11 +13,19 @@ from chatbotactions import ChatBot
 from graphdriver import *
 from api_parser.apiparsermodule import ApiParserModule
 import os
+from datetime import date
+import random
 app = FastAPI()
 templates = Jinja2Templates(directory="frontend/templates")
+logging.basicConfig(
+    filename="logs/api.log",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],os.environ["NEO4J_PASSWORD"])
 api_parser = ApiParserModule()
 #chatbot = ChatBot()
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials = True,
@@ -38,9 +46,12 @@ class Article(BaseModel):
     doi: str
     journal: str
     keyword: List[str]
-class Articles(BaseModel):
+    publication_year: int
+    generation: int
+class CitationMapping(BaseModel):
     articles: List[Article]
-    index: int
+    referencer_doi: str  
+
 class TitleList(BaseModel):
     titles: List[str]
 class MattermostContext(BaseModel):
@@ -57,23 +68,24 @@ class DoiCommand(BaseModel):
     payload: Dict[str,str]
 
 
-@app.post("/addarticles/")
-async def add_article_to_graph(articles: Articles):
-    print("success")
-    db_driver.populateNetwork(articles)
 
 
-@app.post("/addarticle/")
+
+@app.post("/add_article/")
 async def add_article_to_graph(article: Article):
     article_ = {}
     article_["doi"] = article.doi
     article_["title"] = article.title
     article_["abstract"] = article.abstract
-    article_["authors"] = [author.name for author in article.authors]
-    article_["keywords"] = [keyword.keyword for keyword in article.keyword]
+    article_["authors"] = [author for author in article.authors]
+    article_["keywords"] = [keyword for keyword in article.keyword]     
     article_["journal"] = article.journal
-    db_driver.populateNetwork(article_)
-
+    article_["publication_year"] = article.publication_year
+    article_["generation"] = article.generation
+    logmessage = f"APILOG: {article.doi} add requested!"
+    logging.info(logmessage)
+    db_driver.add_article(article_)
+    
 
 @app.post("/addbylist/")
 async def add_keywords(keywords: Intermediate):
@@ -82,7 +94,6 @@ async def add_keywords(keywords: Intermediate):
         writer = csv.writer(csv_f)
         for key, value in keywords.content.items():
             writer.writerow([key, value])
-
 
 @app.post("/update_article_ranking/")
 async def update_article_ranking(mattermost_request: MatterMostRequest):
@@ -101,17 +112,17 @@ async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_i
 
 
 @app.get("/update_kiosk/")
-async def update_kiosk():
-    random_ = random.randint(1,10)
-    tb_r = [{"title": "test " + str(random_), "body": "test" + str(random_), "journal": "test" + str(random_)}]
-    return tb_r
+async def update_kiosk(k=6):
+    relevant_articles = db_driver.get_relevant_articles()
+    for article in relevant_articles:
+        
+        article["authors"] = db_driver.get_article_authors(article["doi"])
+        article["journal"] = db_driver.get_article_journal(article["doi"])
 
+    return [random.choice(relevant_articles) for idx in range(k)]
 @app.post("/link_citations/")
-async def link_citations(articles: Articles):
-    df = pandas.read_csv("data/output.csv", delimiter=",")
-    new = df.drop(df[df["times cited"] == 0].index)
-    new.reset_index(inplace=True)
-    for article in articles.articles:
+async def link_citations(citation_mapping: CitationMapping):
+    for article in citation_mapping.articles:
         article_ = {}
         article_["doi"] = article.doi
         article_["title"] = article.title
@@ -119,8 +130,10 @@ async def link_citations(articles: Articles):
         article_["authors"] = article.authors
         article_["keywords"] = article.keyword
         article_["journal"] = article.journal
-        db_driver.add_citing_articles(article_, new["doi"][articles.index])
-
+        article_["generation"] = article.generation
+        article_["publication_year"] = article.publication_year
+        db_driver.add_citing_articles(article_, citation_mapping.referencer_doi)
+        logging.info("APILOG: Citation linking requested!")
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
@@ -133,4 +146,4 @@ async def debug_conn():
     print("success")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=5001, log_level="debug")
+    uvicorn.run("main:app", host="0.0.0.0", port=5001)
