@@ -1,4 +1,4 @@
-from os import name, environ
+import os
 from typing import Dict, List
 from neo4j import GraphDatabase
 import json
@@ -58,7 +58,7 @@ class GraphDBDriver:
     @staticmethod
     def _get_node_by_name(tx):
         nodes = []
-        results = tx.run('MATCH (n:Article) RETURN n LIMIT 1')
+        results = tx.run('MATCH (n:Article) RETURN n.title, n.doi ')
         for record in results:
             nodes.append(record)
         return nodes
@@ -84,9 +84,6 @@ class GraphDBDriver:
         tx.run("MATCH (p:Post {id:$post_id}), (u:User {id:$user_id}) MERGE (u) -[r:voted]->(p) SET r.vote = $vote", post_id=post["post_id"],user_id=post["user_id"], vote=post["action"])
 
 if __name__ == "__main__":
-    driver = GraphDBDriver("bolt://localhost:7687", "neo4j", "password")
-    with open("data/parsed_articles.json", "r") as fp:
-        articles = json.load(fp)
-    for article in articles:
-        driver.populateNetwork(article)
+    db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],os.environ["NEO4J_PASSWORD"])
+    result = db_driver.get_node_by_name()
     test = 0
