@@ -10,8 +10,8 @@ class ApiParserModule:
         # Configure API key authorization for web of science: key
         configuration = woslite_client.Configuration()
         configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
-        self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
-   #    
+        #self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
+ 
     
     def parse(self, api: str, query_param:str):
         #ARXIV parses all available fields
@@ -33,7 +33,7 @@ class ApiParserModule:
         #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
         if api == "wos":
             database_id = "WOS"
-            usr_query = f'TI=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
+            usr_query = f'ALL=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
             count = 1  # int | Number of records returned in the request
             first_record = 1  # int | Specific record, if any within the result set to return. Cannot be less than 1 and greater than 100000.
             try:
@@ -58,10 +58,10 @@ def parse_arxiv_result_dict(article_dict):
     if article_dict["feed"]["opensearch:totalResults"]["#text"] != "0":
         for result in article_dict["feed"]["entry"]:
             article = {}
-            art_title = result["title"]
-            article["title"] = art_title
-            abstract = result["summary"]
-            article["abstract"] = abstract
+            article["title"] = result["title"]
+            
+            article["abstract"]= result["summary"]
+            
             try:
                 authors = [{"name":author["name"]} for author in result["author"]]
                 article["authors"] = authors
@@ -123,5 +123,5 @@ def parse_wos_results(api_response):
         return article
 if __name__ == "__main__":
     parser = ApiParserModule()
-    article_list = parser.parse("chemrxiv", "Karsten Reuter")
+    article_list = parser.parse("wos", '10.26434/chemrxiv-2022-zrnbx')
     test = 0

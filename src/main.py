@@ -104,7 +104,7 @@ async def update_article_ranking(mattermost_request: MatterMostRequest):
     db_driver.update_post_ranking(post)
 
 
-@app.post("/add_doi/")
+@app.post("/chatbot/add_doi/")
 async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_id:str = Form(...), channel_id:str = Form(...)):
     if token == "ok3t9dmjtp8n8qq3s8ww4mxdhy":
         print(text)
