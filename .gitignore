@@ -13,4 +13,18 @@ data/not_found.json
 api_parser/__pycache__/apiparsermodule.cpython-38.pyc
 __pycache__/main.cpython-38.pyc
 __pycache__/main.cpython-38.pyc
+<<<<<<< HEAD
 graphdriver.py
+=======
+kiosk_frontend/src/components/CardItem/CardItem.js
+logs/graph_log.log
+logs/main_api.log
+logs/api.log
+data/output_.csv
+api_parser/__pycache__/apiparsermodule.cpython-38.pyc
+__pycache__/main.cpython-38.pyc
+__pycache__/graphdriver.cpython-38.pyc
+sandbox.py
+input.csv
+
+>>>>>>> 10226af52efd5573ec204284767e1f3db5ed3370

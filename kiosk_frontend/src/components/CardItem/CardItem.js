@@ -1,7 +1,7 @@
 import React from "react";
 import "./CardItem.css";
 
-function CardItem({ title, author, journal }) {
+function CardItem({ title, doi, authors, journal, publication_year }) {
   return (
     <div className="Card">
       <div className="CardHeader">
@@ -9,8 +9,10 @@ function CardItem({ title, author, journal }) {
       </div>
 
       <div className="CardBody">
-        <h5> Author: {author} </h5>
-        <h5> Journal:{journal}</h5>
+        <h5> DOI: {doi}</h5>
+        <h5> Author: {authors} </h5>
+        <h5> Journal: {journal}</h5>
+        <h5> Publication Year: {publication_year}</h5>
       </div>
     </div>
   );
