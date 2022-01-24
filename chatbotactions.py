@@ -4,7 +4,7 @@ class ChatBot:
     def __init__(self):
         self.driver = Driver
         token = os.environ["CHATBOT_TOKEN"]
-        self.driver = Driver(options={"url": "thmm.rz-berlin.mpg.de","token":token, "debug": True})
+        self.driver = Driver(options={"url": "thmm.rz-berlin.mpg.de/","token":token, "scheme":"https","port":443})
         self.driver.login()
 
     def post_relevant_article(self, article):
