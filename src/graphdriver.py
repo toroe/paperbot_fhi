@@ -17,9 +17,26 @@ class GraphDBDriver:
         self.driver.close()
 
     def add_article(self, article):
-        with self.driver.session() as session:
-            session.write_transaction(self._add_article_to_graph, article)
+        with self.driver.session() as session:           
+                session.write_transaction(self._add_article_to_graph, article)
         self.driver.close()
+
+    def add_user_article(self, article, user_id):
+        with self.driver.session() as session:
+            session.write_transaction(self._add_user_article_to_graph, article, user_id)
+        self.driver.close()
+    def get_article_by_doi(self, doi):
+        with self.driver.session() as session:
+            article_ = session.read_transaction(self._get_article_by_doi, doi)
+        self.driver.close()
+        if article_ == []:
+            return None
+        else:
+            article = {}
+            article["doi"] = article_["a"]["doi"]
+            article["title"] = article_["a"]["title"]
+            article["publication_year"] = article_["a"]["publication_year"]
+            return article
         
     def get_articles_doi(self, generation: str, limit: str):
         with self.driver.session() as session:
@@ -113,7 +130,44 @@ class GraphDBDriver:
             logging.warning(logmessage)
                 
         return result
-
+    @staticmethod
+    def _add_user_article_to_graph(tx, article, user_id):
+        doi = article["doi"]
+        title = article["title"]
+        abstract = article["abstract"]
+        authors = article["authors"]
+        keywords = article["keywords"]
+        journal = article["journal"]
+        publication_year = article["publication_year"]
+        user_id = user_id
+        creation_date=date.today()
+        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract, publication_year: $publication_year})', doi=doi, title=title, abstract=abstract, publication_year=publication_year)
+        tx.run("MATCH (a:Article {doi:$doi}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", doi=doi, creation_date=creation_date)
+        tx.run("MATCH (a:Article{doi:$doi}) MERGE (u:User{id:$user_id})  MERGE (u)<-[:user_added]-(a)", user_id=user_id, doi=doi)
+        for author in authors:
+            tx.run('MERGE (a:Author {name: $name})', name=author)
+            tx.run("MATCH (a:Author {name: $name}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", name=author, creation_date=creation_date)
+            tx.run('MATCH (a:Article {doi:$doi}), (b:Author {name:$author}) MERGE (b)-[r:isAuthor]->(a)', doi=doi, author=author)
+        if keywords is not None:
+            for keyword in keywords:
+                tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
+                tx.run("MATCH (a:Keyword {keyword:$keyword}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date", keyword=keyword, creation_date=creation_date)
+                tx.run('MATCH (a:Article {doi:$doi}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', doi=doi, keyword=keyword)
+        tx.run('MERGE (a:Journal {name:$journal})', journal=journal)
+        tx.run('MATCH (a:Journal {name:$journal}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date', journal=journal, creation_date=creation_date)
+        tx.run('MATCH (a:Article  {doi:$doi}), (b:Journal {name:$journal}) MERGE (a)-[r:publishedIn]->(b)', doi=doi, journal=journal)
+        result = tx.run("MATCH (a:Article  {doi:$doi}) RETURN a", doi=doi)
+        if result is not None:
+            logmessage = f"GRAPHLOG: {doi} added per request by user: {user_id}!"
+            logging.info(logmessage)
+        else:
+            logmessage = f"GRAPHLOG: ERROR ADDING {doi}"
+            logging.warning(logmessage)
+    @staticmethod
+    def _get_article_by_doi(tx, doi):
+        results = tx.run("MATCH (a:Article {doi:$doi}) RETURN a", doi=doi)
+        article = [record for record in results]
+        return article
     @staticmethod
     def _get_article_authors(tx, doi):
         results = tx.run('MATCH (a:Article{doi:$doi}) <-[:isAuthor]-(b) RETURN b', doi=doi)

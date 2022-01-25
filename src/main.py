@@ -22,9 +22,9 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S')
-db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],"$cheisse4ldder")
+db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],os.environ["NEO4J_PASSWORD"])
 api_parser = ApiParserModule()
-chatbot = ChatBot(token= "cw4ona15y3f57mobs3p6rdba5r", primary_channel_id="u7km46zfofrpzf3q7m344mj5kw")
+#chatbot = ChatBot(token= os.environ["CHATBOT_TOKEN"], primary_channel_id="138hexmf4tfrdmsz6o9pzieftc")
 
 app.add_middleware(
     CORSMiddleware,
@@ -107,8 +107,21 @@ async def update_article_ranking(mattermost_request: MatterMostRequest):
 @app.post("/chatbot/add_doi/")
 async def add_article_by_doi(token: str = Form(...),text:str = Form(...), user_id:str = Form(...), channel_id:str = Form(...)):
     if token == "ok3t9dmjtp8n8qq3s8ww4mxdhy":
-        print(text)
-        print(user_id)
+        article = api_parser.parse("wos", "DO", text)
+        if article is not None:
+            doi = article["doi"]
+            logmessage= f"APILOG: Found article DOI: {doi}\nCheck Database if non existent"
+            logging.info(logmessage)
+            article_ = db_driver.get_article_by_doi(doi)
+            if article_ is not None:
+                print("DOI in system")
+                #chatbot.post_message(f"Article {doi} already in System", channel_id)
+            else:
+                logmessage = f"Article {doi} not in System. Add request send"
+                logging.info(logmessage)
+                db_driver.add_user_article(article, user_id)
+            
+    
 
 @app.get("/chatbot/post_relevant_article/")
 async def post_relevant_article():
@@ -121,6 +134,7 @@ async def update_kiosk(k=6):
     relevant_articles = db_driver.get_relevant_articles()
     for article in relevant_articles:
         article["authors"] = db_driver.get_article_authors(article["doi"])
+        article["authors"] = ", ".join(article["authors"])
         article["journal"] = db_driver.get_article_journal(article["doi"])
     return [random.choice(relevant_articles) for idx in range(k)]
 
@@ -138,6 +152,7 @@ async def link_citations(citation_mapping: CitationMapping):
         article_["publication_year"] = article.publication_year
         db_driver.add_citing_articles(article_, citation_mapping.referencer_doi)
         logging.info("APILOG: Citation linking requested!")
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')

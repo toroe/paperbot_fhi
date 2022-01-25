@@ -10,10 +10,10 @@ class ApiParserModule:
         # Configure API key authorization for web of science: key
         configuration = woslite_client.Configuration()
         configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
-        #self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
+        self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
  
     
-    def parse(self, api: str, query_param:str):
+    def parse(self, api: str, search_field:str, query_param:str):
         #ARXIV parses all available fields
         if api == "arxiv":
             query_param = query_param.replace(" ", "+")
@@ -30,10 +30,10 @@ class ApiParserModule:
             r = requests.get(self.chemrxiv_base_url, params=params)
             article_list = parse_chemrxiv_results(r.json())
             return article_list
-        #WEB OF SCIENCE API scrapes for titles TODO: implementation of further scraping alternatives
+        #WEB OF SCIENCE API ALL FIELDS
         if api == "wos":
             database_id = "WOS"
-            usr_query = f'ALL=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
+            usr_query = f'{search_field}=({query_param})'  # str | User query for requesting data, ex: TS=(cadmium). The query parser will return errors for invalid queries.
             count = 1  # int | Number of records returned in the request
             first_record = 1  # int | Specific record, if any within the result set to return. Cannot be less than 1 and greater than 100000.
             try:
@@ -84,9 +84,9 @@ def parse_arxiv_result_dict(article_dict):
             except (KeyError, TypeError) as e:
                 if isinstance(e, TypeError):
                     keywords = [{"keyword":keyword["@term"]} for keyword in result["category"]]
-                    article["keyword"] = keywords
+                    article["keywords"] = keywords
                 if isinstance(e, KeyError):
-                    article["keyword"] = [{"keyword":""}] 
+                    article["keywords"] = [{"keyword":""}] 
             article_list.append(article)
         return article_list
     else:
@@ -102,7 +102,7 @@ def parse_chemrxiv_results(results_):
             article["authors"] = [author["firstName"] + " " + author["lastName"] for author in article_["item"]["authors"]]
             article["doi"] = article_["item"]["doi"]
             article["journal"] = ""
-            article["keyword"] = [keyword["name"] for keyword in article_["item"]["categories"]]
+            article["keywords"] = [keyword["name"] for keyword in article_["item"]["categories"]]
             article_list.append(article)
     return article_list
 def parse_wos_results(api_response):
@@ -119,9 +119,10 @@ def parse_wos_results(api_response):
             article["journal"] = api_response.data[0].source.source_title[0] + " " + api_response.data[0].source.volume[0]
         except TypeError as e:
             article["journal"] = ""
-        article["keyword"] = api_response.data[0].keyword.keywords
+        article["keywords"] = api_response.data[0].keyword.keywords
+        article["publication_year"] = int(api_response.data[0].source.published_biblio_year[0])
         return article
 if __name__ == "__main__":
     parser = ApiParserModule()
-    article_list = parser.parse("wos", '10.26434/chemrxiv-2022-zrnbx')
+    article_list = parser.parse("wos", "DO","10.1038/s41467-021-22611-4")
     test = 0
