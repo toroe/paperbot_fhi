@@ -17,9 +17,15 @@ class GraphDBDriver:
         self.driver.close()
 
     def add_article(self, article):
-        with self.driver.session() as session:           
+        doi = article["doi"]
+        if self.get_article_by_doi(doi) is None:
+            with self.driver.session() as session:
                 session.write_transaction(self._add_article_to_graph, article)
-        self.driver.close()
+            self.driver.close()
+        else:
+            logmessage= f"GRAPHLOG: Article DOI {doi} already in system"
+            logging.info(logmessage)
+            
 
     def add_user_article(self, article, user_id):
         with self.driver.session() as session:
@@ -32,12 +38,13 @@ class GraphDBDriver:
         if article_ == []:
             return None
         else:
-            article = {}
-            article["doi"] = article_["a"]["doi"]
-            article["title"] = article_["a"]["title"]
-            article["publication_year"] = article_["a"]["publication_year"]
+            for result in article_:
+                article = {}
+                article["doi"] = result["a"]["doi"]
+                article["title"] = result["a"]["title"]
+                article["publication_year"] = result["a"]["publication_year"]
+                article["generation"] = result["a"]["generation"]
             return article
-        
     def get_articles_doi(self, generation: str, limit: str):
         with self.driver.session() as session:
             result = session.read_transaction(self._get_articles_doi,generation, limit)
@@ -76,10 +83,9 @@ class GraphDBDriver:
         journal_ = journal[0]["b"]["name"]
         return journal_
 
-    def add_citing_articles(self, article, source_doi):
+    def link_citing_articles(self, article_doi, source_doi, forward_cited):
         with self.driver.session() as session:
-            session.write_transaction(self._add_article_to_graph, article)
-            session.write_transaction(self._add_citing_articles, article, source_doi)
+            session.write_transaction(self._link_citing_articles, article_doi, source_doi, forward_cited)
         self.driver.close()
 
     def update_article_post(self, article_doi, post_id):
@@ -88,8 +94,12 @@ class GraphDBDriver:
         self.driver.close() 
 
     @staticmethod 
-    def _add_citing_articles(tx, article, source_doi):
-        result = tx.run('MATCH (a:Article  {doi:$source_doi}), (b:Article {doi:$doi}) MERGE (b)-[r:cites]->(a) RETURN a, b', doi=article["doi"], source_doi=source_doi)
+    def _link_citing_articles(tx, article_doi, source_doi, forward_cited):
+        if forward_cited:
+            result = tx.run('MATCH (a:Article  {doi:$source_doi}), (b:Article {doi:$doi}) MERGE (b)-[r:cites]->(a) RETURN a, b', doi=article_doi, source_doi=source_doi)
+        else:
+            result = tx.run('MATCH (a:Article  {doi:$source_doi}), (b:Article {doi:$doi}) MERGE (a)-[r:cites]->(b) RETURN a, b', doi=article_doi, source_doi=source_doi)
+    
         for record in result:
             logmessage = "GRAPHLOG: Created relationship between {doi1} and {doi2}".format(doi1=record["a"]["doi"], doi2 = record["b"]["doi"])
             logging.info(logmessage)
@@ -106,20 +116,16 @@ class GraphDBDriver:
         publication_year = article["publication_year"]
         generation = article["generation"]
         creation_date=date.today()
-        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract, publication_year: $publication_year})', doi=doi, title=title, abstract=abstract, publication_year=publication_year)
-        tx.run("MATCH (a:Article {doi:$doi}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", doi=doi, creation_date=creation_date)
-        tx.run("MATCH (a:Article {doi:$doi}) WHERE a.generation IS NULL SET a.generation = $generation", doi=doi, generation=generation)
+        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract, publication_year: $publication_year, creation_date: $creation_date, generation: $generation})', 
+        doi=doi, title=title, abstract=abstract, publication_year=publication_year, creation_date=creation_date, generation=generation)
         for author in authors:
             tx.run('MERGE (a:Author {name: $name})', name=author)
-            tx.run("MATCH (a:Author {name: $name}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", name=author, creation_date=creation_date)
             tx.run('MATCH (a:Article {doi:$doi}), (b:Author {name:$author}) MERGE (b)-[r:isAuthor]->(a)', doi=doi, author=author)
         if keywords is not None:
             for keyword in keywords:
                 tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
-                tx.run("MATCH (a:Keyword {keyword:$keyword}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date", keyword=keyword, creation_date=creation_date)
                 tx.run('MATCH (a:Article {doi:$doi}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', doi=doi, keyword=keyword)
         tx.run('MERGE (a:Journal {name:$journal})', journal=journal)
-        tx.run('MATCH (a:Journal {name:$journal}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date', journal=journal, creation_date=creation_date)
         tx.run('MATCH (a:Article  {doi:$doi}), (b:Journal {name:$journal}) MERGE (a)-[r:publishedIn]->(b)', doi=doi, journal=journal)
         result = tx.run("MATCH (a:Article  {doi:$doi}) RETURN a", doi=doi)
         if result is not None:
@@ -130,6 +136,7 @@ class GraphDBDriver:
             logging.warning(logmessage)
                 
         return result
+        
     @staticmethod
     def _add_user_article_to_graph(tx, article, user_id):
         doi = article["doi"]
@@ -141,20 +148,17 @@ class GraphDBDriver:
         publication_year = article["publication_year"]
         user_id = user_id
         creation_date=date.today()
-        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract, publication_year: $publication_year})', doi=doi, title=title, abstract=abstract, publication_year=publication_year)
-        tx.run("MATCH (a:Article {doi:$doi}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", doi=doi, creation_date=creation_date)
+        tx.run('MERGE (a:Article {doi: $doi, title: $title, abstract: $abstract, publication_year: $publication_year, creation_date: $creation_date})', 
+        doi=doi, title=title, abstract=abstract, publication_year=publication_year, creation_date=creation_date)
         tx.run("MATCH (a:Article{doi:$doi}) MERGE (u:User{id:$user_id})  MERGE (u)<-[:user_added]-(a)", user_id=user_id, doi=doi)
         for author in authors:
             tx.run('MERGE (a:Author {name: $name})', name=author)
-            tx.run("MATCH (a:Author {name: $name}) WHERE a.creation_date IS NULL SET a.creation_date = $creation_date", name=author, creation_date=creation_date)
             tx.run('MATCH (a:Article {doi:$doi}), (b:Author {name:$author}) MERGE (b)-[r:isAuthor]->(a)', doi=doi, author=author)
         if keywords is not None:
             for keyword in keywords:
                 tx.run('MERGE (a:Keyword {keyword: $keyword})', keyword=keyword)
-                tx.run("MATCH (a:Keyword {keyword:$keyword}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date", keyword=keyword, creation_date=creation_date)
                 tx.run('MATCH (a:Article {doi:$doi}), (b:Keyword {keyword:$keyword}) MERGE (a)-[r:isAbout]->(b)', doi=doi, keyword=keyword)
         tx.run('MERGE (a:Journal {name:$journal})', journal=journal)
-        tx.run('MATCH (a:Journal {name:$journal}) WHERE a.creation_date is NULL SET a.creation_date = $creation_date', journal=journal, creation_date=creation_date)
         tx.run('MATCH (a:Article  {doi:$doi}), (b:Journal {name:$journal}) MERGE (a)-[r:publishedIn]->(b)', doi=doi, journal=journal)
         result = tx.run("MATCH (a:Article  {doi:$doi}) RETURN a", doi=doi)
         if result is not None:

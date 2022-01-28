@@ -21,7 +21,7 @@ class ChatBot:
         
         attachment = {"attachments": [{"pretext": "Please assess the article for relevancy", 
                         "actions":[{"id": "upvote","name": "Relevant","integration": 
-                        {"url": "http://localhost:5001/chatbot/update_article_ranking/","context": {"action":"upvote"}}},{"id": "downvote","name": "Not relevant","integration": {"url": "http://localhost:5001/update_article_ranking/","context": {"action":"downvote"}}}]}]}
+                        {"url": "http://localhost:5001/chatbot/update_article_ranking/","context": {"action":"upvote"}}},{"id": "downvote","name": "Not relevant","integration": {"url": "http://localhost:5001/chatbot/update_article_ranking/","context": {"action":"downvote"}}}]}]}
         message = "Title: " + article["title"] + "\nDOI: " + article["doi"] +"\nAuthors: " + ", ".join(article["authors"]) + "\nJournal: " + article["journal"] + "\nPublication Year: " + str(article["publication_year"])
         result = self.driver.posts.create_post(options={"channel_id":self.primary_channel_id, "message":message, "props":attachment})
         result["article_doi"] = article["doi"]
@@ -44,11 +44,8 @@ if __name__ == "__main__":
         article["authors"] = db_driver.get_article_authors(article["doi"])
         article["journal"] = db_driver.get_article_journal(article["doi"])
     relevant_article = random.choice(articles)
-    test = bot.get_user()
-    debug = 0
-    """
     result = bot.post_relevant_article(relevant_article)
     if (result["article_doi"] and result["id"]) is not None:
         logging.info("CHATBOTLOG: SUCCESSFULLY POSTED")
         db_driver.update_article_post(result["article_doi"], result["id"])
-        """
+ 

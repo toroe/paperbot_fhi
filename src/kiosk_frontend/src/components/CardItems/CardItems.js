@@ -3,11 +3,6 @@ import CardItem from "../CardItem/CardItem";
 import "./CardItems.css";
 function CardItems() {
   const [cards, setCards] = useState([]);
-
-  
- 
-
-   
   const fetchPost = () => {
     console.log("in fetchPost");
     fetch("http://localhost:5001/kiosk/update/")
@@ -16,17 +11,11 @@ function CardItems() {
         console.log(result);
         setCards(result);
       });
-  };
-         
+  };         
   useEffect(() => {
     fetchPost();
     setInterval(fetchPost, 60000);
-    
   }, [])
-     
-  console.log("salam");
-     
-
   return (
     <div>
       <div className="CardItems">
@@ -41,11 +30,8 @@ function CardItems() {
           />
         ))}
       </div>
-            
-            
+   
     </div>
   );
-  
-
 }
 export default CardItems;

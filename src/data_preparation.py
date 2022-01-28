@@ -43,8 +43,6 @@ ARTICLE GENERATION: integer
 def prepare_articles(df, generation):
     df['Abstract'] = df['Abstract'].fillna("")
     articles = []
-    all_cleaned_names = []
-    all_keywords = []
     for index, row in df.iterrows():
         article = {}
         article["title"] = row[2]
@@ -102,11 +100,8 @@ def decode_doi(encoded_doi):
 def create_base_generation(base_gen_filepath: str, db_driver: GraphDBDriver):
     dataframe = load_xls(base_gen_filepath)
     articles = prepare_articles(dataframe, 0)
-    for article in articles[:100]:
+    for article in articles:
         db_driver.add_article(article)
-    for article in articles[101:]:
-        rnd = random.choice(articles[:100])
-        db_driver.add_citing_articles(article, rnd["doi"])
 def create_linked_generation(linked_gen_filepath: str, db_driver: GraphDBDriver):
     pass
 if __name__ == "__main__":

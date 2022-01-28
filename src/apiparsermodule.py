@@ -1,19 +1,26 @@
 from __future__ import print_function
+import argparse
+import os
 import urllib.request as libreq
 import xmltodict, time, logging, woslite_client, scholarly, requests
 from woslite_client.rest import ApiException
 from pprint import pprint
+from src.graphdriver import GraphDBDriver
 class ApiParserModule:
     def __init__(self):
         self.arxiv_base_url = "http://export.arxiv.org/api/query?search_query="
         self.chemrxiv_base_url = "https://chemrxiv.org/engage/chemrxiv/public-api/v1/items"
         # Configure API key authorization for web of science: key
         configuration = woslite_client.Configuration()
-        configuration.api_key['X-ApiKey'] = '0eda632cc7f9313a038b4f955db9f731dc64a738'
+        configuration.api_key['X-ApiKey'] = os.environ["WOSLITE_KEY"]
         self.wos_search_api_instance = woslite_client.SearchApi(woslite_client.ApiClient(configuration))
- 
+        logging.basicConfig(
+    filename="logs/api.log",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
     
-    def parse(self, api: str, search_field:str, query_param:str):
+    def parse(self, api: str, search_field:str , query_param:str):
         #ARXIV parses all available fields
         if api == "arxiv":
             query_param = query_param.replace(" ", "+")
@@ -42,13 +49,12 @@ class ApiParserModule:
                 article_list = parse_wos_results(api_response)
                 if article_list != None:
                     return article_list
-                else:
-                    
+                else:    
                     logging.info(f"{query_param} not found")
-                    return f"{query_param} not found"
-        
+                    return None  
             except ApiException as e:
                 print("Exception when calling SearchApi->root_get: %s\\n" % e)
+                return None
      
 """
 Takes an ARXIV API result dicts, iterates through results and returns a list with article dicts in it
@@ -58,10 +64,8 @@ def parse_arxiv_result_dict(article_dict):
     if article_dict["feed"]["opensearch:totalResults"]["#text"] != "0":
         for result in article_dict["feed"]["entry"]:
             article = {}
-            article["title"] = result["title"]
-            
-            article["abstract"]= result["summary"]
-            
+            article["title"] = result["title"]         
+            article["abstract"]= result["summary"]     
             try:
                 authors = [{"name":author["name"]} for author in result["author"]]
                 article["authors"] = authors
@@ -92,6 +96,7 @@ def parse_arxiv_result_dict(article_dict):
     else:
         print("No results found!")
         return None
+
 def parse_chemrxiv_results(results_):
     article_list = []
     if results_["totalCount"] > 0:
@@ -122,7 +127,31 @@ def parse_wos_results(api_response):
         article["keywords"] = api_response.data[0].keyword.keywords
         article["publication_year"] = int(api_response.data[0].source.published_biblio_year[0])
         return article
+        
 if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--api",help="API that should be parsed")
+    argparser.add_argument("--search_term", default="", help="Specify which search term should be used")
+    argparser.add_argument("--query_term")
+    argparser.add_argument("--db_connection", default="bolt://localhost:7687")
+    args = argparser.parse_args()
     parser = ApiParserModule()
-    article_list = parser.parse("wos", "DO","10.1038/s41467-021-22611-4")
-    test = 0
+    db_driver = GraphDBDriver(args.db_connection, os.environ["NEO4J_USER"],os.environ["NEO4J_PASSWORD"])
+    logmessage = f"PARSERLOG: Scraping for {args.api} started"
+    logging.info(logmessage)
+    article_list = parser.parse(args.api, args.search_term,args.query_term)
+    for article in article_list:
+        doi = article["doi"]
+        if db_driver.get_article_by_doi(doi) is None:
+            for reference in article["references"]:
+                article_ = db_driver.get_article_by_doi(reference["doi"])
+                if article_ is not None:
+                    if article_["generation"] == (1 or 2):
+                        logmessage = f"PARSERLOG: Relevant Article {doi} found!"
+                        logging.info(logmessage)
+                        db_driver.add_article(article)
+                        db_driver.link_citing_articles(doi, article_["doi"], True)
+    logmessage = f"PARSERLOG: Scraping for {args.api} finished"
+    logging.info(logmessage)
+                        
+ 
