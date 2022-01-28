@@ -97,13 +97,37 @@ def decode_doi(encoded_doi):
     doi = encoded_doi.replace("%42%", "/")
     doi = doi.replace("%24%", ".")
     return doi
+"""
+Creates the first generation of articles in database. Input genone.xls
+"""
 def create_base_generation(base_gen_filepath: str, db_driver: GraphDBDriver):
     dataframe = load_xls(base_gen_filepath)
-    articles = prepare_articles(dataframe, 0)
+    articles = prepare_articles(dataframe, 1)
     for article in articles:
         db_driver.add_article(article)
+"""
+Creates and links 2 and 0 generation of articles. 
+Input file path:
+data/GEN2/
+data/GEN1_REFERENCEE/
+
+GEN2 forard_cited=False, generation= 2
+GEN1_REFERENCEE forard_cited=True, generation= 0
+"""
 def create_linked_generation(linked_gen_filepath: str, db_driver: GraphDBDriver):
-    pass
+    for encoded_doi_file in glob.glob(linked_gen_filepath+"*"):
+        data = pd.read_excel(encoded_doi_file)
+        data["Publication Year"] = data["Publication Year"].fillna(0).astype(int)
+        data.dropna(subset=["DOI"], inplace=True)
+        df = pd.DataFrame(data, columns=["Author Full Names", "Source Title", "Article Title", "Abstract","Document Type", "Keywords Plus", "DOI","Book DOI", "Publication Year"])
+        encoded_doi = encoded_doi_file.replace(linked_gen_filepath, "").replace(".xls", "")
+        doi = decode_doi(encoded_doi)
+        #Genertation 0 
+        articles = prepare_articles(df, generation=2)
+        for article in articles:
+            db_driver.add_article(article)
+            db_driver.link_citing_articles(article["doi"], doi, forward_cited=False)
+            print(doi)
 if __name__ == "__main__":
     db_driver = GraphDBDriver("bolt://localhost:7687", os.environ["NEO4J_USER"],"$cheisse4ldder")
 
